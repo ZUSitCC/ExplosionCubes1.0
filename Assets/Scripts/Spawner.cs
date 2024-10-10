@@ -1,60 +1,73 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Exploder))]
-[RequireComponent(typeof(Renderer))]
-
 public class Spawner : MonoBehaviour
 {
-    private List<Rigidbody> _rigidbodiesCloneCube = new List<Rigidbody>();
 
-    private float _dispersion = 0.08f;
+    [Header("Настройка спавнера.")]
+    [Tooltip("Компонент взрыватель.")]
+    [SerializeField] private Exploder _exploder;
 
-    private int _scaleDevider = 2;
-    private int _chanceDevider = 2;
+    [Tooltip("Минимальное количество клонов.")]
+    [SerializeField, Range(1, 6)] private int _countClonesMin = 2;
+    [Tooltip("Максимальное количество клонов.")]
+    [SerializeField, Range(1, 6)] private int _countClonesMax = 6;
 
-    public void Spawn(int count, float chanceSplit)
+    private int _clonesCount;
+
+    private float _dispersion = 0.04f;
+
+    private void OnValidate()
     {
-        for (int i = 0; i < count; i++)
+        if (_countClonesMin >= _countClonesMax)
+            _countClonesMax = _countClonesMax - 1;
+    }
+
+    private void OnEnable()
+    {
+        Cube.Clicked += Spawn;
+    }
+
+    private void OnDisable()
+    {
+        Cube.Clicked -= Spawn;
+    }
+
+    public void Spawn(Cube cube)
+    {
+        _clonesCount = Random.Range(_countClonesMin, _countClonesMax + 1);
+
+        if (cube.SplitChance >= Random.value)
+            _exploder.Explode(Create(_clonesCount, cube), cube.transform.position);
+    }
+
+    public List<Rigidbody> Create(int count, Cube cube)
+    {
+        List<Rigidbody> rigidbodies = new List<Rigidbody>();
+
+        for (int i = 0;  i < count; i++)
         {
-            GameObject cube = Instantiate(gameObject, RandomizePosition(), Quaternion.identity);
-            
-            Rigidbody rigidbody = cube.GetComponent<Rigidbody>();
+            Cube cloneCube = Instantiate(
+                cube, RandomizePosition(cube.transform.position), Quaternion.identity
+                );
 
-            cube.GetComponent<InputHandler>().SetSplitChance(chanceSplit / _chanceDevider);
-            cube.GetComponent<Renderer>().material.color = Random.ColorHSV();
-            cube.transform.localScale = transform.localScale / _scaleDevider;
+            cloneCube.Initialization(cube.SplitChance);
 
-            SetRigidbody(rigidbody);
-
-            _rigidbodiesCloneCube.Add(rigidbody);
+            rigidbodies.Add(cloneCube.Rigidbody);
         }
-    }
 
-    public List<Rigidbody> GetExplodibleObjects()
-    {
-        List<Rigidbody> rigidbodiesCloneCube = new List<Rigidbody>();
-
-        foreach (Rigidbody rigidbody in _rigidbodiesCloneCube)
-            rigidbodiesCloneCube.Add(rigidbody);
-
-        return rigidbodiesCloneCube;
-    }
-
-    private void SetRigidbody(Rigidbody rigidbody)
-    {
-        rigidbody.useGravity = true;
-        rigidbody.interpolation = RigidbodyInterpolation.Extrapolate;
-        rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        return rigidbodies;
     }
     
-    private Vector3 RandomizePosition()
+    private Vector3 RandomizePosition(Vector3 position)
     {
-        return new Vector3(Disperce(transform.position.x), Disperce(transform.position.y), Disperce(transform.position.z));
+        return new Vector3(
+            Disperce(position.x), Disperce(position.y), Disperce(position.z)
+            );
     }
 
     private float Disperce(float number)
     {
-        return number * Random.Range(1 - _dispersion, 1 + _dispersion);
+        return number + Random.Range(-_dispersion, _dispersion);
     }
 }
